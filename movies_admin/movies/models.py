@@ -60,7 +60,8 @@ class FilmWork(UUIDMixin, TimeStampedMixin):
         blank=True,
         null=True
     )
-
+    certificate = models.CharField('certificate', max_length=512, blank=True)
+    file_path = models.FileField('file', blank=True, null=True, upload_to='movies/')
     rating = models.FloatField('rating', blank=True,
                                validators=[MinValueValidator(0),
                                            MaxValueValidator(10)])
