@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class TimeStampedMixin(models.Model):
@@ -47,11 +48,9 @@ class FilmWork(UUIDMixin, TimeStampedMixin):
         null=True
     )
 
-    rating = models.FloatField(
-        'rating',
-        blank=True,
-        null=True
-    )
+    rating = models.FloatField('rating', blank=True,
+                               validators=[MinValueValidator(0),
+                                           MaxValueValidator(10)])
 
     type = models.TextField(
         'type',
