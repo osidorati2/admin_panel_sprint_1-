@@ -20,8 +20,8 @@ class UUIDMixin(models.Model):
 
 
 class Genre(UUIDMixin, TimeStampedMixin):
-    name = models.CharField('name', max_length=255)
-    description = models.TextField('description', blank=True)
+    name = models.CharField(_('name'), max_length=255)
+    description = models.TextField(_('description'), blank=True)
 
     class Meta:
         db_table = 'content"."genre'
@@ -34,7 +34,7 @@ class Genre(UUIDMixin, TimeStampedMixin):
 
 
 class Person(UUIDMixin, TimeStampedMixin):
-    full_name = models.CharField('full name', max_length=255)
+    full_name = models.CharField(_('full name'), max_length=255)
 
     class Meta:
         db_table = 'content"."person'
@@ -52,11 +52,15 @@ class FilmWork(UUIDMixin, TimeStampedMixin):
         MOVIE = 'movie', 'Movie'
         TV_SHOW = 'tv_show', 'TV Show'
 
-    title = models.CharField('title', max_length=255)
-    description = models.TextField('description', blank=True)
+    title = models.CharField(_('title'), max_length=255)
+
+    description = models.TextField(
+        _('description'),
+        blank=True
+    )
 
     creation_date = models.DateField(
-        'creation date',
+        _('creation date'),
         blank=True,
         null=True
     )
@@ -67,7 +71,7 @@ class FilmWork(UUIDMixin, TimeStampedMixin):
                                            MaxValueValidator(10)])
 
     type = models.TextField(
-        'type',
+        _('type'),
         choices=Types.choices,
         default=Types.MOVIE
     )
@@ -110,25 +114,41 @@ class GenreFilmWork(UUIDMixin):
 
         verbose_name = 'Жанр произведения'
         verbose_name_plural = 'Жанры произведений'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['film_work', 'genre'],
+                name='film_work_genre_idx'
+            ),
+        ]
 
 
 class PersonFilmWork(UUIDMixin):
     film_work = models.ForeignKey(
-        'FilmWork',
+        FilmWork,
         on_delete=models.CASCADE
     )
 
     person = models.ForeignKey(
-        'Person',
+        Person,
         on_delete=models.CASCADE
     )
 
-    role = models.TextField('role')
+    role = models.TextField(
+        _('role'),
+        choices=Roles.choices
+    )
 
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'content"."person_film_work'
 
-        verbose_name = 'Участник произведения'
-        verbose_name_plural = 'Участники произведений'
+        verbose_name = _('Участник произведения')
+        verbose_name_plural = _('Участники произведений')
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=['film_work', 'person', 'role'],
+                name='film_work_person_role_idx'
+            ),
+        ]
