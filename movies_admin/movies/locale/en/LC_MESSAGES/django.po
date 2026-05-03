@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-02 16:08+0000\n"
+"POT-Creation-Date: 2026-05-03 18:44+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,6 +17,107 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-#: movies/models.py:56
+
+#: movies/apps.py:8
+msgid "movies"
+msgstr ""
+
+#: movies/models.py:28
+msgid "name"
+msgstr ""
+
+#: movies/models.py:29 movies/models.py:63
+msgid "description"
+msgstr ""
+
+#: movies/models.py:34
+msgid "genre"
+msgstr ""
+
+#: movies/models.py:35 movies/models.py:104
+msgid "genres"
+msgstr ""
+
+#: movies/models.py:42
+msgid "full name"
+msgstr ""
+
+#: movies/models.py:47
+msgid "person"
+msgstr ""
+
+#: movies/models.py:48 movies/models.py:110
+msgid "persons"
+msgstr ""
+
+#: movies/models.py:57
+msgid "movie"
+msgstr ""
+
+#: movies/models.py:58
+msgid "tv show"
+msgstr ""
+
+#: movies/models.py:60
 msgid "title"
+msgstr ""
+
+#: movies/models.py:68
+msgid "creation date"
+msgstr ""
+
+#: movies/models.py:74
+msgid "certificate"
+msgstr ""
+
+#: movies/models.py:80
+msgid "file"
+msgstr ""
+
+#: movies/models.py:87
+msgid "rating"
+msgstr ""
+
+#: movies/models.py:96
+msgid "type"
+msgstr ""
+
+#: movies/models.py:116
+msgid "film work"
+msgstr ""
+
+#: movies/models.py:117
+msgid "film works"
+msgstr ""
+
+#: movies/models.py:143
+msgid "genre film work"
+msgstr ""
+
+#: movies/models.py:144
+msgid "genre film works"
+msgstr ""
+
+#: movies/models.py:157
+msgid "actor"
+msgstr ""
+
+#: movies/models.py:158
+msgid "director"
+msgstr ""
+
+#: movies/models.py:159
+msgid "writer"
+msgstr ""
+
+#: movies/models.py:172
+msgid "role"
+msgstr ""
+
+#: movies/models.py:181
+msgid "person film work"
+msgstr ""
+
+#: movies/models.py:182
+msgid "person film works"
 msgstr ""
