@@ -32,3 +32,19 @@ class FilmWork:
     modified: datetime
     file_path: str | None
     certificate: str | None
+
+@dataclass
+class GenreFilmWork:
+    id: UUID
+    genre_id: UUID
+    film_work_id: UUID
+    created: datetime
+
+
+@dataclass
+class PersonFilmWork:
+    id: UUID
+    person_id: UUID
+    film_work_id: UUID
+    role: str
+    created: datetime
