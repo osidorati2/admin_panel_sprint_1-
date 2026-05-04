@@ -3,8 +3,6 @@ import csv
 import io
 import logging
 import sqlite3
-from dataclasses import dataclass
-from datetime import datetime
 from typing import Generator, List
 from uuid import UUID
 
@@ -45,167 +43,164 @@ def truncate_tables(conn):
 # ---------- SQLITE LOADER ---------- #
 
 class SQLiteLoader:
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn):
         self.conn = conn
         self.conn.row_factory = sqlite3.Row
 
-    def load_table(self, table_name: str, batch_size: int = BATCH_SIZE) -> Generator[List[sqlite3.Row], None, None]:
+    def load(self, table: str, batch_size: int = BATCH_SIZE):
         cursor = self.conn.cursor()
-        cursor.execute(f"SELECT * FROM {table_name}")
+        cursor.execute(f"SELECT * FROM {table}")
+
+        batch_num = 0
 
         while True:
-            rows = cursor.fetchmany(batch_size)
-            if not rows:
+            batch = cursor.fetchmany(batch_size)
+            if not batch:
                 break
-            yield rows
 
+            batch_num += 1
+            logging.info(f"{table}: loaded batch {batch_num} ({len(batch)} rows)")
+
+            yield batch
+
+
+GENRE_UPSERT = """
+INSERT INTO content.genre (id, name, description, created, modified)
+VALUES (%s, %s, %s, %s, %s)
+ON CONFLICT (id) DO UPDATE SET
+name = EXCLUDED.name,
+description = EXCLUDED.description,
+modified = EXCLUDED.modified;
+"""
+
+PERSON_UPSERT = """
+INSERT INTO content.person (id, full_name, created, modified)
+VALUES (%s, %s, %s, %s)
+ON CONFLICT (id) DO UPDATE SET
+full_name = EXCLUDED.full_name,
+modified = EXCLUDED.modified;
+"""
+
+FILMWORK_UPSERT = """
+INSERT INTO content.film_work (
+    id, title, description, creation_date,
+    rating, type, created, modified,
+    file_path, certificate
+)
+VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+ON CONFLICT (id) DO UPDATE SET
+title = EXCLUDED.title,
+description = EXCLUDED.description,
+creation_date = EXCLUDED.creation_date,
+rating = EXCLUDED.rating,
+type = EXCLUDED.type,
+modified = EXCLUDED.modified,
+file_path = EXCLUDED.file_path,
+certificate = EXCLUDED.certificate;
+"""
+
+GENRE_FILM_UPSERT = """
+INSERT INTO content.genre_film_work (id, genre_id, film_work_id, created)
+VALUES (%s,%s,%s,%s)
+ON CONFLICT (id) DO NOTHING;
+"""
+
+PERSON_FILM_UPSERT = """
+INSERT INTO content.person_film_work (id, person_id, film_work_id, role, created)
+VALUES (%s,%s,%s,%s,%s)
+ON CONFLICT (id) DO NOTHING;
+"""
+
+def transform_base(row: dict):
+    row["id"] = to_uuid(row["id"])
+
+    if "created_at" in row:
+        row["created"] = row.pop("created_at")
+
+    if "updated_at" in row:
+        row["modified"] = row.pop("updated_at")
+
+    return row
 
 # ---------- POSTGRES SAVER ---------- #
 
 class PostgresSaver:
-    def __init__(self, conn: _connection):
+    def __init__(self, conn):
         self.conn = conn
 
-    def copy(self, table: str, columns: list[str], buffer: io.StringIO):
+    def execute_batch(self, query: str, data: list[tuple], table_name: str):
         try:
             with self.conn.cursor() as cur:
-                with cur.copy(
-                    f"COPY content.{table} ({', '.join(columns)}) FROM STDIN WITH CSV"
-                ) as copy:
-                    copy.write(buffer.getvalue())
+                cur.executemany(query, data)
 
             self.conn.commit()
-            logging.info(f"{table}: loaded {buffer.getvalue().count(chr(10))} rows")
+
+            logging.info(f"{table_name}: inserted {len(data)} rows")
 
         except Exception:
-            logging.exception(f"Error loading table {table}")
+            logging.exception(f"{table_name}: failed batch insert")
             self.conn.rollback()
             raise
 
-    def build_buffer(self, rows, columns, transform):
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-
-        for row in rows:
-            row_dict = transform(dict(row))
-            writer.writerow([row_dict.get(col) for col in columns])
-
-        buffer.seek(0)
-        return buffer
-
-    # ---------- TRANSFORMS ---------- #
-
-    def base_transform(self, row: dict):
-        row["id"] = to_uuid(row["id"])
-
-        if "created_at" in row:
-            row["created"] = row.pop("created_at")
-
-        if "updated_at" in row:
-            row["modified"] = row.pop("updated_at")
-
-        return row
-
-    def transform_genre(self, row):
-        return self.base_transform(row)
-
-    def transform_person(self, row):
-        return self.base_transform(row)
-
-    def transform_film_work(self, row):
-        row = self.base_transform(row)
-
-        # гарантируем NOT NULL
-        row["certificate"] = row.get("certificate") or ""
-
-        return row
-
-    def transform_genre_film_work(self, row):
-        row["id"] = to_uuid(row["id"])
-        row["genre_id"] = to_uuid(row["genre_id"])
-        row["film_work_id"] = to_uuid(row["film_work_id"])
-
-        if "created_at" in row:
-            row["created"] = row.pop("created_at")
-
-        return row
-
-    def transform_person_film_work(self, row):
-        row["id"] = to_uuid(row["id"])
-        row["person_id"] = to_uuid(row["person_id"])
-        row["film_work_id"] = to_uuid(row["film_work_id"])
-
-        if "created_at" in row:
-            row["created"] = row.pop("created_at")
-
-        return row
-
 
 # ---------- MAIN PIPELINE ---------- #
-
-def load_from_sqlite(sqlite_conn: sqlite3.Connection, pg_conn: _connection):
+def load_from_sqlite(sqlite_conn, pg_conn):
     loader = SQLiteLoader(sqlite_conn)
     saver = PostgresSaver(pg_conn)
 
+    logging.info("Migration started")
+
     try:
         # ---------- GENRE ---------- #
-        for batch in loader.load_table("genre"):
-            buffer = saver.build_buffer(
-                batch,
-                ["id", "name", "description", "created", "modified"],
-                saver.transform_genre,
-            )
-            saver.copy("genre", ["id", "name", "description", "created", "modified"], buffer)
+        logging.info("Starting genre migration")
+
+        for batch in loader.load("genre"):
+            data = [
+                (r["id"], r["name"], r["description"], r["created"], r["modified"])
+                for r in (transform_base(dict(x)) for x in batch)
+            ]
+            saver.execute_batch(GENRE_UPSERT, data, "genre")
+
+        logging.info("Genre migration finished")
 
         # ---------- PERSON ---------- #
-        for batch in loader.load_table("person"):
-            buffer = saver.build_buffer(
-                batch,
-                ["id", "full_name", "created", "modified"],
-                saver.transform_person,
-            )
-            saver.copy("person", ["id", "full_name", "created", "modified"], buffer)
+        logging.info("Starting person migration")
+
+        for batch in loader.load("person"):
+            data = [
+                (r["id"], r["full_name"], r["created"], r["modified"])
+                for r in (transform_base(dict(x)) for x in batch)
+            ]
+            saver.execute_batch(PERSON_UPSERT, data, "person")
+
+        logging.info("Person migration finished")
 
         # ---------- FILM WORK ---------- #
-        for batch in loader.load_table("film_work"):
-            buffer = saver.build_buffer(
-                batch,
-                [
-                    "id", "title", "description", "creation_date", "rating",
-                    "type", "created", "modified", "file_path", "certificate"
-                ],
-                saver.transform_film_work,
-            )
-            saver.copy(
-                "film_work",
-                [
-                    "id", "title", "description", "creation_date", "rating",
-                    "type", "created", "modified", "file_path", "certificate"
-                ],
-                buffer,
-            )
+        logging.info("Starting film_work migration")
 
-        # ---------- GENRE FILM WORK ---------- #
-        for batch in loader.load_table("genre_film_work"):
-            buffer = saver.build_buffer(
-                batch,
-                ["id", "genre_id", "film_work_id", "created"],
-                saver.transform_genre_film_work,
-            )
-            saver.copy("genre_film_work", ["id", "genre_id", "film_work_id", "created"], buffer)
+        for batch in loader.load("film_work"):
+            data = []
+            for raw in batch:
+                r = transform_base(dict(raw))
 
-        # ---------- PERSON FILM WORK ---------- #
-        for batch in loader.load_table("person_film_work"):
-            buffer = saver.build_buffer(
-                batch,
-                ["id", "person_id", "film_work_id", "role", "created"],
-                saver.transform_person_film_work,
-            )
-            saver.copy(
-                "person_film_work",
-                ["id", "person_id", "film_work_id", "role", "created"],
-                buffer,
-            )
+                data.append((
+                    r["id"],
+                    r["title"],
+                    r.get("description"),
+                    r.get("creation_date"),
+                    r.get("rating"),
+                    r["type"],
+                    r["created"],
+                    r["modified"],
+                    r.get("file_path"),
+                    r.get("certificate") or "",
+                ))
+
+            saver.execute_batch(FILMWORK_UPSERT, data, "film_work")
+
+        logging.info("Film_work migration finished")
+
+        logging.info("Migration completed successfully")
 
     except Exception:
         logging.exception("Migration failed")
