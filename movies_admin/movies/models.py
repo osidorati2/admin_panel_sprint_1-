@@ -74,6 +74,7 @@ class FilmWork(UUIDMixin, TimeStampedMixin):
         _('certificate'),
         max_length=512,
         blank=True,
+        null=True,
     )
 
     file_path = models.FileField(
