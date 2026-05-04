@@ -1,3 +1,4 @@
+import os
 import csv
 import io
 import logging
@@ -8,6 +9,7 @@ from typing import Generator, List
 from uuid import UUID
 
 import psycopg
+from dotenv import load_dotenv
 from psycopg import connection as _connection
 
 
@@ -214,12 +216,14 @@ def load_from_sqlite(sqlite_conn: sqlite3.Connection, pg_conn: _connection):
 # ---------- ENTRY POINT ---------- #
 
 if __name__ == "__main__":
+    load_dotenv()
+
     dsl = {
-        "dbname": "movies_database",
-        "user": "app",
-        "password": "123qwe",
-        "host": "127.0.0.1",
-        "port": 5432,
+        "dbname": os.environ.get('DB_NAME'),
+        "user": os.environ.get('DB_USER'),
+        "password": os.environ.get('DB_PASSWORD'),
+        "host": os.environ.get('DB_HOST', '127.0.0.1'),
+        "port": os.environ.get('DB_PORT', 5432),
     }
 
     with sqlite3.connect("db.sqlite") as sqlite_conn, psycopg.connect(**dsl) as pg_conn:
